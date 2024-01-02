@@ -1,0 +1,41 @@
+{
+  "name": "ADS Connector Example",
+  "SenderAMS": "192.168.1.153.1.1",
+  "SenderHostName" : "LinuxMint-VM",
+  "devices": [
+      {
+        "type": "default",
+        "name": "Test PLC 1",
+        "AMSnetID" : "192.168.1.62.1.1",
+        "PLCAddress" : "192.168.1.127",
+        "username" : "Administrator",
+        "password" : "1",
+        "routename" : "Mint",
+        "port" : 801,
+        "converter" : "AdsUplinkConverter",
+        "mapping" : [
+          {
+            "attributes" : [
+              {
+                "tag" : "MAIN.LuxInterior",
+                "type" : "pyads.PLCTYPE_INT",
+                "key" : "Lux Interior"
+              },
+              {
+                "tag" : "MAIN.LuxExterior",
+                "type" : "pyads.PLCTYPE_INT",
+                "key" : "Lux Exterior"
+              }
+            ],
+            "timeseries" : [
+              {
+                "tag" : "MAIN.luxExterior",
+                "type" : "pyads.PLCTYPE_INT",
+                "key" : "Lux Exterior"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+}

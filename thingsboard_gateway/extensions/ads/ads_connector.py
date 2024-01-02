@@ -61,15 +61,13 @@ class ADSConnector(Connector, Thread):
         self.stopped = True  # Service variable for check state
         self.__connected = False  # Service variable for check connection to device
         self.__devices = {}  # Dictionary with devices, will contain devices configurations, converters for devices and serial port objects
-        self.__plc = []
-        self.__notification_items = {}
-
+        self.__notification_items = {} # Dictionary with notification variables from ADS
         self.__load_converters(connector_type)  # Call function to load converters and save it into devices dictionary
         # done in load_converters devices_config = self.__config.get('devices')
         #self.__create_routes() # Create AMS route to destination PLC
         self.__connect_to_devices()  # Call function for connect to devices
-        #self._log.info('Custom connector %s initialization success.', self.get_name())  # Message to logger
-        #self._log.info("Devices in configuration file found: %s ", '\n'.join(device for device in self.__devices))  # Message to logger
+        self._log.info('Custom connector %s initialization success.', self.get_name())  # Message to logger
+        self._log.info("Devices in configuration file found: %s ", '\n'.join(device for device in self.__devices))  # Message to logger
 
     def __create_routes(self):
         # Set AMS local address
@@ -80,7 +78,12 @@ class ADSConnector(Connector, Thread):
         # Create route on destination plc's
         for device in self.__config.get('devices'):
             try:
-                pyads.add_route_to_plc(self.__config.get('SenderAMS'),self.__config.get('SenderHostName'),device.get('PLCAddress'),device.get('username'),device.get('password'),device.get('routename'))
+                pyads.add_route_to_plc(self.__config.get('SenderAMS'),
+                                       self.__config.get('SenderHostName'),
+                                       device.get('PLCAddress'),
+                                       device.get('username'),
+                                       device.get('password'),
+                                       device.get('routename'))
                 #should return true if OK
                 pyads.close_port()
                 
@@ -90,41 +93,58 @@ class ADSConnector(Connector, Thread):
                 pyads.close_port()
 
     def __connect_to_devices(self): #opens connections to devices
-        self._log.debug("Connect to devices. Full device list")
-        #self._log.debug(self.__devices)
         for device in self.__devices:
-            self._log.debug(self.__devices[device]["device_config"])
-        for device in self.__config.get('devices'):    
-            #self._log.debug(device)
             try:
                 connection_start = time.time()
-                self.__plc = pyads.Connection(device.get('AMSnetID'),device.get('port'),device.get('PLCAddress'))
-                self.__plc.open() #Should get Info: Connected to xxx.xxx.xx.xx here..
+                if self.__devices[device].get("ads") is None \
+                or self.__devices[device]["ads"] is None \
+                or not self.__devices[device]["ads"].is_open:
+                    self._log.debug("No ads object in __device, trying to make object")
+                    self.__devices[device]["ads"] = None
+
+                    while self.__devices[device]["ads"] is None or not self.__devices[device]["ads"].is_open: #Try to connect
+                        device_config = self.__devices[device]["device_config"]
+                        self.__devices[device]["ads"] = pyads.Connection(ams_net_id=device_config.get('AMSnetID'),
+                                                                         ams_net_port=device_config.get('port'),
+                                                                         ip_address=device_config.get('PLCAddress'))
+                        #Open PLC port
+                        self.__devices[device]["ads"].open()
+
+                        time.sleep(.1)
+                        if time.time() - connection_start > 10:
+                            self._log.error("Connection refused per timeout for device %s", device_config.get("name"))
+                            break
 
             except pyads.ADSError as err:
                 self._log.error("ADS Error: %s connecting to device", err)
-                
+
             except Exception as e:
                 self._log.error("Exceptions")
                 self._log.exception(e)
-            else:  # if no exception handled - add device and change connection state
-                #self._log.debug([device]["device_config"]["name"])
-                #self._log.debug(self.__devices[device]["device_config"]["name"])
-                #self.__gateway.add_device(self.__devices[device]["device_config"]["name"], {"connector": self}, self.__devices[device]["device_config"]["type"])
+
+            else:
+                self.__gateway.add_device(self.__devices[device]["device_config"]["name"], 
+                                          {"connector": self}, 
+                                          self.__devices[device]["device_config"]["type"])
                 self.__connected = True
+
+                #TODO: refactor and make add_device_notification dynamic from config...
                 def update(name, value):
                     self._log.debug("Variable %s changed its value to %d", name, value)
-                    #self.run.converted_data = value
 
-                self.add_device_notification("MAIN.LuxExterior", pyads.PLCTYPE_INT, update)
+                for map in device_config['mapping']:
+                    for attr in map['attributes']:
+                        self.add_device_notification(self.__devices[device]["ads"],
+                                                     attr['tag'],
+                                                     pyads.PLCTYPE_INT, 
+                                                     update)
 
-
-    def add_device_notification(self, name, plc_datatype, callback):
+    def add_device_notification(self, device_obj, name, plc_datatype, callback): #added device object
         """Add notification to the ADS device """
         attr = pyads.NotificationAttrib(ctypes.sizeof(plc_datatype))
 
         try:
-            hnotify, huser = self.__plc.add_device_notification(
+                hnotify, huser = device_obj.add_device_notification(
                 name, attr, self._device_notification_callback
             )
         except pyads.ADSError as err:
@@ -176,41 +196,6 @@ class ADSConnector(Connector, Thread):
             self._log.warn("No callback available for this datatype")
 
         notification_item.callback(notification_item.name, value)
-
-    """def __ads_notification(self):
-        keys = ['attributes', 'timeseries']
-        device_config = self.__config.get('devices')
-
-        for device in device_config:
-            vars_mapping = device['mapping']
-            for mapping in vars_mapping:
-                for key in keys: #attributes and timeseries
-                    tags = mapping[key]
-                    for tag in tags:
-                        self.__interest_variables.update({tag['tag'] : tag['type']})
-                        
-                        
-                    
-
-
-
-        self._log.debug(self.__interest_variables)
-        symbol = self.__plc.get_symbol(self.__interest_variables)
-        symbol.add_device_notification(cb)
-
- # define the callback which extracts the value of the variable
-    def mycallback(notification, data):
-        data_type = tags[data]
-        handle, timestamp, value = plc.parse_notification(notification, data_type)
-        print(value)
-
-    attr = pyads.NotificationAttrib(sizeof(pyads.PLCTYPE_INT))
-
-    # add_device_notification returns a tuple of notification_handle and
-    # user_handle which we just store in handles
-    handles = self._plc.add_device_notification('GVL.integer_value', attr, mycallback)
-"""
-
 
     def open(self):  # Function called by gateway on start
         self.stopped = False
@@ -283,28 +268,28 @@ class ADSConnector(Connector, Thread):
         
     def close(self):  # Close connect function, usually used if exception handled in gateway main loop or in connector main loop
         self.stopped = True
-        
-        for notification_item in self.__notification_items.values():
-            self._log.debug(
-                "Deleting device notification %d, %d",
-                notification_item.hnotify,
-                notification_item.huser
-            )
-            try:
-                self.__plc.del_device_notification(
-                    notification_item.hnotify, notification_item.huser
+        for device in self.__devices:
+            for notification_item in self.__notification_items.values():
+                self._log.debug(
+                    "Deleting device %s notification %d, %d",
+                    device,
+                    notification_item.hnotify,
+                    notification_item.huser
                 )
+                try:
+                    self.__devices[device]["ads"].del_device_notification(
+                        notification_item.hnotify, notification_item.huser
+                    )
+                except pyads.ADSError as err:
+                    self._log.error(err)
+            try:
+                if self.__devices[device]["ads"].is_open:
+                    self.__devices[device]["ads"].close()
             except pyads.ADSError as err:
                 self._log.error(err)
-        try:
-            self.__plc.close()
-        except pyads.ADSError as err:
-            self._log.error(err)
 
-        for device in self.__devices:
             self.__gateway.del_device(self.__devices[device]["device_config"]["name"])
-            if self.__devices[device]['serial'].isOpen():
-                self.__devices[device]['serial'].close()
+
         self._log.reset()
 
     def on_attributes_update(self, content):  # Function used for processing attribute update requests from ThingsBoard
