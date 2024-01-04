@@ -33,8 +33,7 @@ class AdsUplinkConverter(AdsConverter):
                                          end_stat_type='convertedBytesFromDevice')
 
     def convert(self, config, variable_to_convert, value_to_convert):
-        self._log.debug(self.__config) #must get here the mapping object only.... but we're getting entire config object
-                  
+        #self._log.debug(self.__config) #must get here the mapping object only.... but we're getting entire config object
 
         dict_result = {
             'deviceName': self.__config.get('name', 'CustomADSDevice'),
@@ -64,7 +63,7 @@ class AdsUplinkConverter(AdsConverter):
                         full_value = dict_incoming_data['value']
 
                         dict_result[self.__datatypes[data_type]].append({full_key: full_value})
-                        
+
         except Exception as e:
             self._log.exception(e)
 

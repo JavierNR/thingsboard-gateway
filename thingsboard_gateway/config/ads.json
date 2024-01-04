@@ -33,6 +33,12 @@
                             "type" : "pyads.PLCTYPE_INT",
                             "key" : "Lux Exterior"
                           }
+                      ],
+                      "attributeUpdates" : [
+                        {
+                          "attributeOnThingsboard" : "test",
+                          "tag" : "MAIN.strTime"
+                        }
                       ]
                     }
       }

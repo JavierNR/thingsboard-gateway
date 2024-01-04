@@ -286,21 +286,18 @@ class ADSConnector(Connector, Thread):
         self._log.reset()
 
     def on_attributes_update(self, content):  # Function used for processing attribute update requests from ThingsBoard
-        #TODO: Work in progress
-        self._log.debug(content)
+        #TODO: Add checks...
         if self.__devices.get(content["device"]) is not None:
             device_config = self.__devices[content["device"]].get("device_config")
-            if device_config is not None and device_config.get("attributeUpdates") is not None:
-                requests = device_config["attributeUpdates"]
+            if device_config is not None and device_config['mapping'].get("attributeUpdates") is not None:
+                requests = device_config['mapping']["attributeUpdates"]
                 for request in requests:
-                    attribute = request.get("attributeOnThingsBoard")
-                    self._log.debug(attribute)
+                    attribute = request.get("attributeOnThingsboard")
                     if attribute is not None and attribute in content["data"]:
                         try:
                             value = content["data"][attribute]
-                            str_to_send = str(request["stringToDevice"].replace("${" + attribute + "}", str(value))).encode("UTF-8")
-                            self.__devices[content["device"]]["serial"].write(str_to_send)
-                            self._log.debug("Attribute update request to device %s : %s", content["device"], str_to_send)
+                            self.__devices[content["device"]]["ads"].write_by_name(request['tag'], value)
+                            self._log.debug("Attribute update request to device %s : Writing Tag %s with value %s", content["device"], request['tag'], value)
                             time.sleep(.01)
                         except Exception as e:
                             self._log.exception(e)
