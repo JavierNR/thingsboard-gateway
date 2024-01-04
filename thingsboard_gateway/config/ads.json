@@ -13,29 +13,28 @@
         "routename" : "Mint",
         "port" : 801,
         "converter" : "AdsUplinkConverter",
-        "mapping" : [
-          {
-            "attributes" : [
-              {
-                "tag" : "MAIN.LuxInterior",
-                "type" : "pyads.PLCTYPE_INT",
-                "key" : "Lux Interior"
-              },
-              {
-                "tag" : "MAIN.LuxExterior",
-                "type" : "pyads.PLCTYPE_INT",
-                "key" : "Lux Exterior"
-              }
-            ],
-            "timeseries" : [
-              {
-                "tag" : "MAIN.luxExterior",
-                "type" : "pyads.PLCTYPE_INT",
-                "key" : "Lux Exterior"
-              }
-            ]
-          }
-        ]
+        "mapping" : 
+                    {
+                      "attributes" : [
+                          {
+                            "tag" : "MAIN.LuxInterior",
+                            "type" : "pyads.PLCTYPE_INT",
+                            "key" : "Lux Interior"
+                          },
+                          {
+                            "tag" : "MAIN.LuxExterior",
+                            "type" : "pyads.PLCTYPE_INT",
+                            "key" : "Lux Exterior"
+                          }
+                      ],
+                      "timeseries" : [
+                          {
+                            "tag" : "MAIN.luxExterior",
+                            "type" : "pyads.PLCTYPE_INT",
+                            "key" : "Lux Exterior"
+                          }
+                      ]
+                    }
       }
     ]
 }

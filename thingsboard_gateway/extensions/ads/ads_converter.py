@@ -13,41 +13,10 @@
 #     See the License for the specific language governing permissions and
 #     limitations under the License.
 
-from thingsboard_gateway.connectors.converter import Converter
+from thingsboard_gateway.connectors.converter import Converter, abstractmethod
 
 
-class AdsUplinkConverter(Converter):
-    def __init__(self, config, logger):
-        self._log = logger
-        self.__config = config
-
+class AdsConverter(Converter):
+    @abstractmethod
     def convert(self, config, data):
-        dict_result = {
-            'deviceName': self.__config.get('name', 'CustomADSDevice'),
-            'deviceType': self.__config.get('deviceType', 'default'),
-            'attributes': [],
-            'telemetry': []
-        }
-        keys = ['attributes', 'telemetry']
-        for key in keys:
-            self._log.debug(key)
-            dict_result[key] = []
-            if self.__config.get(key) is not None:
-                for config_object in self.__config.get(key):
-                    data_to_convert = data
-                    #if config_object.get('untilDelimiter') is not None:
-                    #    data_to_convert = data.split(config_object.get('untilDelimiter').encode('UTF-8'))[0]
-                    #if config_object.get('fromDelimiter') is not None:
-                    #    data_to_convert = data.split(config_object.get('fromDelimiter').encode('UTF-8'))[1]
-                    #if config_object.get('toByte') is not None:
-                    #    to_byte = config_object.get('toByte')
-                    #    if to_byte == -1:
-                    #        to_byte = len(data) - 1
-                    #    data_to_convert = data_to_convert[:to_byte]
-                    #if config_object.get('fromByte') is not None:
-                    #    from_byte = config_object.get('fromByte')
-                    #    data_to_convert = data_to_convert[from_byte:]
-                    converted_data = {config_object['key']: data_to_convert.decode('UTF-8')}
-                    dict_result[key].append(converted_data)
-        self._log.debug("Converted data: %s", dict_result)
-        return dict_result
+        pass

@@ -35,6 +35,8 @@ from thingsboard_gateway.connectors.connector import Connector # Import base cla
 from thingsboard_gateway.tb_utility.tb_loader import TBModuleLoader
 from thingsboard_gateway.tb_utility.tb_logger import init_logger
 
+from thingsboard_gateway.extensions.ads.ads_uplink_converter import AdsUplinkConverter
+
 #from thingsboard_gateway.extensions.ads.ads_converter import AdsUplinkConverter
 
 # Tuple to hold data needed for ads notification
@@ -63,7 +65,8 @@ class ADSConnector(Connector, Thread):
         self.__devices = {}  # Dictionary with devices, will contain devices configurations, converters for devices and serial port objects
         self.__notification_items = {} # Dictionary with notification variables from ADS
         self.__load_converters(connector_type)  # Call function to load converters and save it into devices dictionary
-        # done in load_converters devices_config = self.__config.get('devices')
+        #devices_config = self.__config.get('devices') done in load_converters 
+
         #self.__create_routes() # Create AMS route to destination PLC
         self.__connect_to_devices()  # Call function for connect to devices
         self._log.info('Custom connector %s initialization success.', self.get_name())  # Message to logger
@@ -86,9 +89,12 @@ class ADSConnector(Connector, Thread):
                                        device.get('routename'))
                 #should return true if OK
                 pyads.close_port()
+
+            except pyads.ADSError as err:
+                self._log.error("ADS Error: %s while creating route to device", err)
                 
             except Exception as e:
-                self._log.error("Exceptions adding routes")
+                self._log.error("Exception while adding route")
                 self._log.exception(e) 
                 pyads.close_port()
 
@@ -129,13 +135,19 @@ class ADSConnector(Connector, Thread):
                 self.__connected = True
 
                 #TODO: refactor and make add_device_notification dynamic from config...
+                
                 def update(name, value):
                     self._log.debug("Variable %s changed its value to %d", name, value)
+                    converted_data = self.__devices[device]['converter'].convert(self.__devices[device]['device_config'], name, value) #send variable name and value to converter
+                    self._log.debug(converted_data)
+                    self.__gateway.send_to_storage(self.get_name(), converted_data)
+                self._log.debug(device_config['mapping'])
 
-                for map in device_config['mapping']:
-                    for attr in map['attributes']:
+
+                for map in device_config['mapping']['attributes']:
+                    #for attr in map['attributes']:
                         self.add_device_notification(self.__devices[device]["ads"],
-                                                     attr['tag'],
+                                                     map['tag'],
                                                      pyads.PLCTYPE_INT, 
                                                      update)
 
@@ -235,26 +247,7 @@ class ADSConnector(Connector, Thread):
         try:
             while not self.stopped:
                 for device in self.__devices:
-
-                    """device_serial_port = self.__devices[device]["serial"]
-                    received_character = b''
-                    data_from_device = b''
-                    while not self.stopped and received_character != b'\n':  # We will read until receive LF symbol
-                        try:
-                            received_character = device_serial_port.read(1)  # Read one symbol per time
-                        except AttributeError as e:
-                            if device_serial_port is None:
-                                self.__connect_to_devices()  # if port not found - try to connect to it
-                                raise e
-                        except Exception as e:
-                            self._log.exception(e)
-                            break
-                        else:
-                            data_from_device = data_from_device + received_character"""
                     try:
-                        #if len(data_from_device) > 0:
-                        #    converted_data = self.__devices[device]['converter'].convert(self.__devices[device]['device_config'], data_from_device)
-                        #    self.__gateway.send_to_storage(self.get_name(), converted_data)
                         time.sleep(.1)
                     except Exception as e:
                         self._log.exception(e)
@@ -293,6 +286,7 @@ class ADSConnector(Connector, Thread):
         self._log.reset()
 
     def on_attributes_update(self, content):  # Function used for processing attribute update requests from ThingsBoard
+        #TODO: Work in progress
         self._log.debug(content)
         if self.__devices.get(content["device"]) is not None:
             device_config = self.__devices[content["device"]].get("device_config")
